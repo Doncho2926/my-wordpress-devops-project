@@ -1,0 +1,26 @@
+# Ignore compiled files and directories
+/vendor/
+/node_modules/
+
+# Docker specific ignores
+# Ignore Docker volumes data. These are typically managed by Docker.
+# We will restore data from backups or generate new volumes.
+/db_data/
+/wordpress_data/
+
+# Ignore sensitive WordPress configuration file
+# This file contains database credentials and secret keys.
+# It should not be committed to a public repository.
+# We will generate this file dynamically or provide it via Ansible/CI/CD.
+wp-config.php
+
+# Ignore database backup file
+wordpress_db_backup.sql
+
+# Ignore wp-content backup file
+wp-content-backup.tar.gz
+
+# IDE and OS specific files
+.DS_Store
+.env
+*.log

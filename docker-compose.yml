@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.6
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: Donchowordpressblog1! # <-- Избери си СИЛНА парола за root потребителя на базата данни!
+      MYSQL_DATABASE: 192_168_56_11_nip_io
+      MYSQL_USER: 192-168-56-11.nip.io-ibMJ5k
+      MYSQL_PASSWORD: wg6WQcNNwktu3xLcSh
+    volumes:
+      - db_data:/var/lib/mysql
+  wordpress:
+    image: wordpress:6.5.5-php8.2-fpm-alpine # Можем да изберем конкретна версия на WordPress и PHP
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: 192-168-56-11.nip.io-ibMJ5k
+      WORDPRESS_DB_PASSWORD: wg6WQcNNwktu3xLcSh
+      WORDPRESS_DB_NAME: 192_168_56_11_nip_io
+    volumes:
+      - wordpress_data:/var/www/html
+    depends_on:
+      - db
+  nginx:
+    image: nginx:1.25.4-alpine # Можем да изберем конкретна версия на Nginx
+    restart: always
+    ports:
+      - "8000:80" # Ще мапнем порт 80 на хоста към порт 80 на Nginx контейнера
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf # Ще създадем наш Nginx конфиг
+      - wordpress_data:/var/www/html # Монтираме същия volume като WordPress, за да може Nginx да обслужва статични файлове
+    depends_on:
+      - wordpress
+
+volumes:
+    db_data: {}
+    wordpress_data: {}
