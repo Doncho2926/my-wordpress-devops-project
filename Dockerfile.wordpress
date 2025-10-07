@@ -1,7 +1,5 @@
-# Базира се на официалния WordPress PHP-FPM образ
 FROM wordpress:php8.2-fpm
 
-# Инсталирай нужните библиотеки за работа с изображения и ZIP
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
@@ -12,14 +10,13 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-install gd mysqli zip opcache fileinfo \
     && rm -rf /var/lib/apt/lists/*
 
-# Настройки за PHP лимити (по-големи за работа с медии)
+# ⬇️ ТУК ДОБАВИ тези лимити за PHP
 RUN { \
     echo "upload_max_filesize = 64M"; \
     echo "post_max_size = 64M"; \
-    echo "memory_limit = 256M"; \
+    echo "memory_limit = 512M"; \
     echo "max_execution_time = 300"; \
     echo "max_input_time = 300"; \
+    echo "max_input_vars = 5000"; \
+    echo "max_file_uploads = 50"; \
     } > /usr/local/etc/php/conf.d/uploads.ini
-
-# Добави здравен check (по избор)
-HEALTHCHECK CMD php-fpm -t || exit 1
