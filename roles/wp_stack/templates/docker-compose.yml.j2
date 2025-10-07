@@ -35,10 +35,17 @@ services:
     volumes:
       - wordpress_data:/var/www/html
       - ./wp-config.php:/var/www/html/wp-config.php
-      # 💡 PHP настройки за качване на по-големи изображения
       - ./php.ini:/usr/local/etc/php/conf.d/uploads.ini
     networks:
       - wp_net
+    # 🧩 Инсталира GD библиотеката при стартиране
+    command: >
+      bash -c "
+      apt-get update &&
+      apt-get install -y libjpeg-dev libpng-dev libfreetype6-dev &&
+      docker-php-ext-configure gd --with-freetype --with-jpeg &&
+      docker-php-ext-install gd &&
+      php-fpm"
 
   nginx:
     image: nginx:alpine
