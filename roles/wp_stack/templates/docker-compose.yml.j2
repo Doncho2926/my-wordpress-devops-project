@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   db:
     image: mysql:8.0
@@ -31,8 +33,10 @@ services:
       WORDPRESS_DB_USER: "wp"
       WORDPRESS_DB_PASSWORD: "StrongDBpass!"
     volumes:
-      - wordpress_data:/var/www/html          # общият volume, който ще сподели nginx
+      - wordpress_data:/var/www/html
       - ./wp-config.php:/var/www/html/wp-config.php
+      # 💡 PHP настройки за качване на по-големи изображения
+      - ./php.ini:/usr/local/etc/php/conf.d/uploads.ini
     networks:
       - wp_net
 
@@ -45,7 +49,7 @@ services:
       - "8000:80"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - wordpress_data:/var/www/html:ro       # nginx вижда същите WP файлове
+      - wordpress_data:/var/www/html:ro
     networks:
       - wp_net
 
