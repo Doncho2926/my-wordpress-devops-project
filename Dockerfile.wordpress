@@ -1,14 +1,25 @@
+# Базира се на официалния WordPress PHP-FPM образ
 FROM wordpress:php8.2-fpm
 
-# Инсталиране на GD библиотеката за обработка на изображения
+# Инсталирай нужните библиотеки за работа с изображения и ZIP
 RUN apt-get update && apt-get install -y \
-    libjpeg-dev libpng-dev libfreetype6-dev && \
-    docker-php-ext-configure gd --with-freetype --with-jpeg && \
-    docker-php-ext-install gd && \
-    rm -rf /var/lib/apt/lists/*
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libwebp-dev \
+    libzip-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install gd mysqli zip opcache fileinfo \
+    && rm -rf /var/lib/apt/lists/*
 
-# PHP настройки за по-големи изображения и по-дълго време за обработка
-RUN echo "upload_max_filesize=20M" > /usr/local/etc/php/conf.d/uploads.ini && \
-    echo "post_max_size=20M" >> /usr/local/etc/php/conf.d/uploads.ini && \
-    echo "memory_limit=256M" >> /usr/local/etc/php/conf.d/uploads.ini && \
-    echo "max_execution_time=300" >> /usr/local/etc/php/conf.d/uploads.ini
+# Настройки за PHP лимити (по-големи за работа с медии)
+RUN { \
+    echo "upload_max_filesize = 64M"; \
+    echo "post_max_size = 64M"; \
+    echo "memory_limit = 256M"; \
+    echo "max_execution_time = 300"; \
+    echo "max_input_time = 300"; \
+    } > /usr/local/etc/php/conf.d/uploads.ini
+
+# Добави здравен check (по избор)
+HEALTHCHECK CMD php-fpm -t || exit 1
