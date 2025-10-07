@@ -1,2 +1,2 @@
-Стартиране на playbook-a: ansible-playbook -i inventory.ini site.yml --ask-vault-pass
+Стартиране: ansible-playbook -i inventory.ini site.yml --ask-vault-pass
 
