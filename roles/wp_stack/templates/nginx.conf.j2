@@ -12,6 +12,11 @@ server {
         try_files $uri $uri/ /index.php?$args;
     }
 
+    # 🧩 Добави този блок за REST API
+    location /wp-json/ {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
     location ~ \.php$ {
         include fastcgi_params;
         fastcgi_pass wordpress:9000;
