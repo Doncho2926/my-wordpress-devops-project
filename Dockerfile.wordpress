@@ -1,19 +1,40 @@
-FROM wordpress:php8.2-fpm-alpine
+# Използваме официалния WordPress PHP-FPM образ
+FROM wordpress:php8.2-fpm
 
-# Инсталираме нужните пакети за GD, ZIP и др.
-RUN apk add --no-cache \
+# Работна директория
+WORKDIR /var/www/html
+
+# Инсталираме нужните зависимости и PHP разширения
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        apt-utils \
+        pkg-config \
         libpng-dev \
-        libjpeg-turbo-dev \
-        freetype-dev \
+        libjpeg-dev \
+        libfreetype6-dev \
         libwebp-dev \
         libzip-dev \
         zip \
         unzip \
-        bash \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install gd mysqli zip opcache fileinfo
+    && docker-php-ext-install gd mysqli zip opcache fileinfo exif \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Копираме php.ini (лимити за качване)
-COPY ./roles/wp_stack/templates/php.ini /usr/local/etc/php/conf.d/uploads.ini
+# ✅ Копираме персонализирания php.ini (от корена на проекта)
+COPY php.ini /usr/local/etc/php/conf.d/zz-uploads.ini
 
-WORKDIR /var/www/html
+# ✅ Уверяваме се, че WordPress може да записва uploads
+RUN mkdir -p /var/www/html/wp-content/uploads \
+    && chown -R www-data:www-data /var/www/html/wp-content \
+    && chmod -R 775 /var/www/html/wp-content
+
+# ✅ Настройки за WordPress
+ENV WORDPRESS_DEBUG=1
+
+# ✅ Даваме права на www-data върху целия WordPress
+RUN chown -R www-data:www-data /var/www/html
+
+# Експонираме порта на PHP-FPM
+EXPOSE 9000
+
+# ✅ CMD трябва да е последен
+CMD ["php-fpm"]
