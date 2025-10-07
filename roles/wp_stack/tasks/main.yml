@@ -24,10 +24,10 @@
     src: "wp-config.php.j2"
     dest: "{{ wp_config }}"
     mode: "0644"
+    
+- name: Стартирай контейнерите с Docker Compose (с rebuild)
+  command: docker compose -f /opt/wordpress/docker-compose.yml up -d --build
 
-- name: Стартирай контейнерите с Docker Compose
-  ansible.builtin.command:
-    cmd: docker compose -f "{{ compose_file }}" up -d
   args:
     chdir: "{{ project_dir }}"
 
