@@ -42,8 +42,10 @@ jobs:
 
       - name: Run Ansible playbook
         run: |
-          echo "$VAULT_PASS" > .vault_pass.txt
-          ansible-playbook -i inventory.ini site.yml --vault-password-file .vault_pass.txt
+          ansible-playbook -i inventory.ini site.yml
         env:
-          VAULT_PASS: ${{ secrets.VAULT_PASS }}
+          WP_DB_PASSWORD: ${{ secrets.WP_DB_PASSWORD }}
+          WP_ADMIN_PASSWORD: ${{ secrets.WP_ADMIN_PASSWORD }}
+          WP_SALTS: ${{ secrets.WP_SALTS }}
           ANSIBLE_FORCE_COLOR: "true"
+      

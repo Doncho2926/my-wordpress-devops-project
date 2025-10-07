@@ -1,5 +1,6 @@
-# Основни настройки за WordPress стека
+# group_vars/all/main.yml
 
+# Име/порт на проекта
 project_name: my-wordpress-devops-project
 port_http: 8000
 
@@ -13,12 +14,19 @@ wp_db_user: wp
 wp_db_host: db
 wp_table_prefix: wp_
 
-# Админ на WordPress
+# Админ в WP
 wp_admin_user: admin
-wp_admin_email: doncho.donchev84@gmail.com
+wp_admin_email: "doncho.donchev84@gmail.com"
 
 # Контейнер образи
-wordpress_image: wordpress:php8.2-fpm
-nginx_image: nginx:alpine
-mysql_image: mysql:8.0
+wordpress_image: "wordpress:php8.2-fpm"
+nginx_image: "nginx:alpine"
+mysql_image: "mysql:8.0"
+
+# (по желание) източник на кода
 github_repo_url: "https://github.com/Doncho2926/my-wordpress-devops-project.git"
+
+# 🧩 Свързваме Secrets от GitHub Actions
+vault_wp_db_password: "{{ lookup('env', 'WP_DB_PASSWORD') | default('StrongDBpass!', true) }}"
+vault_wp_admin_password: "{{ lookup('env', 'WP_ADMIN_PASSWORD') | default('S3cureP@ss!', true) }}"
+vault_wp_salts: "{{ lookup('env', 'WP_SALTS') | default('', true) }}"
