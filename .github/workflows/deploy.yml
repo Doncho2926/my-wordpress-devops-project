@@ -1,0 +1,32 @@
+name: Deploy WordPress Stack
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible docker.io docker-compose-plugin
+
+      - name: Set up inventory
+        run: |
+          echo "[webservers]" > inventory.ini
+          echo "localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3" >> inventory.ini
+
+      - name: Run Ansible playbook
+        run: |
+          echo "$VAULT_PASS" > .vault_pass.txt
+          ansible-playbook -i inventory.ini site.yml --vault-password-file .vault_pass.txt
+        env:
+          VAULT_PASS: ${{ secrets.VAULT_PASS }}
+          ANSIBLE_FORCE_COLOR: "true"
