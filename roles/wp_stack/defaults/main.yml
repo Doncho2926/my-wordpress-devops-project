@@ -1,0 +1,24 @@
+---
+# defaults file for wp_stack
+# Дефолтни стойности за role "wp_stack"
+# Тези стойности могат да се презаписват от group_vars или Vault
+
+# Папка на проекта
+project_dir: /opt/wordpress
+
+# Docker Compose настройки
+compose_file: "{{ project_dir }}/docker-compose.yml"
+
+# Сервизи (контейнери)
+services:
+  - db
+  - wordpress
+  - nginx
+
+# MySQL настройки (в случай, че не дойдат от Vault)
+wp_db_root_password: "rootpass"
+wp_db_port: 3306
+
+# Път до конфигурационните файлове
+nginx_conf: "{{ project_dir }}/nginx.conf"
+wp_config: "{{ project_dir }}/wp-config.php"

@@ -1,0 +1,58 @@
+
+---
+# Основни задачи за WordPress Docker стек
+
+- name: Клонирай проекта от GitHub (ако има репо)
+  ansible.builtin.git:
+    repo: "{{ github_repo_url | default('', true) }}"
+    dest: "{{ project_dir }}"
+    version: main
+    force: yes
+  when: github_repo_url is defined and github_repo_url != ""
+
+- name: Копирай шаблоните на docker-compose и nginx
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: "docker-compose.yml.j2", dest: "{{ project_dir }}/docker-compose.yml" }
+    - { src: "nginx.conf.j2", dest: "{{ nginx_conf }}" }
+
+- name: Генерирай wp-config.php от шаблон
+  ansible.builtin.template:
+    src: "wp-config.php.j2"
+    dest: "{{ wp_config }}"
+    mode: "0644"
+
+- name: Стартирай контейнерите с Docker Compose
+  ansible.builtin.command:
+    cmd: docker compose -f "{{ compose_file }}" up -d
+  args:
+    chdir: "{{ project_dir }}"
+
+- name: Изчакай MySQL да стане healthy
+  ansible.builtin.shell: |
+    docker inspect --format='{{"{{.State.Health.Status}}"}}' {{ project_name }}_db
+  register: db_health
+  until: db_health.stdout == "healthy"
+  retries: 30
+  delay: 5
+
+- name: Инсталирай WordPress чрез WP-CLI (ако не е инсталиран)
+  ansible.builtin.command: >
+    docker exec -u www-data {{ project_name }}_wordpress
+    wp core install
+    --url="{{ wp_site_url }}"
+    --title="{{ wp_site_title }}"
+    --admin_user="{{ wp_admin_user }}"
+    --admin_password="{{ vault_wp_admin_password }}"
+    --admin_email="{{ wp_admin_email }}"
+    --path=/var/www/html
+  args:
+    chdir: "{{ project_dir }}"
+    creates: /var/www/html/wp-content
+  register: wp_install
+  failed_when: false
+  changed_when: "'Success:' in wp_install.stdout or 'WordPress is already installed.' in wp_install.stdout"
+

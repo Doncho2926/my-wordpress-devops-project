@@ -1,0 +1,57 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: my-wordpress-devops-project_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: wp
+      MYSQL_USER: wp
+      MYSQL_PASSWORD: StrongDBpass!
+      MYSQL_ROOT_PASSWORD: StrongDBpass!
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -pStrongDBpass! --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - wp_net
+
+  wordpress:
+    image: wordpress:php8.2-fpm
+    container_name: my-wordpress-devops-project_wordpress
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: "db:3306"
+      WORDPRESS_DB_NAME: "wp"
+      WORDPRESS_DB_USER: "wp"
+      WORDPRESS_DB_PASSWORD: "StrongDBpass!"
+    volumes:
+      - wordpress_data:/var/www/html          # общият volume, който ще сподели nginx
+      - ./wp-config.php:/var/www/html/wp-config.php
+    networks:
+      - wp_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: my-wordpress-devops-project_nginx
+    depends_on:
+      - wordpress
+    ports:
+      - "8000:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - wordpress_data:/var/www/html:ro       # nginx вижда същите WP файлове
+    networks:
+      - wp_net
+
+volumes:
+  db_data:
+  wordpress_data:
+
+networks:
+  wp_net:

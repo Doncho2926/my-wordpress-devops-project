@@ -1,0 +1,7 @@
+- name: Deploy WordPress via role
+  hosts: webservers
+  become: true
+  vars:
+    project_dir: /opt/wordpress
+  roles:
+    - wp_stack
