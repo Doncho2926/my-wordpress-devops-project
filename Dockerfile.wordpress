@@ -1,22 +1,19 @@
-FROM wordpress:php8.2-fpm
+FROM wordpress:php8.2-fpm-alpine
 
-RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libwebp-dev \
-    libzip-dev \
+# Инсталираме нужните пакети за GD, ZIP и др.
+RUN apk add --no-cache \
+        libpng-dev \
+        libjpeg-turbo-dev \
+        freetype-dev \
+        libwebp-dev \
+        libzip-dev \
+        zip \
+        unzip \
+        bash \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install gd mysqli zip opcache fileinfo \
-    && rm -rf /var/lib/apt/lists/*
+    && docker-php-ext-install gd mysqli zip opcache fileinfo
 
-# ⬇️ ТУК ДОБАВИ тези лимити за PHP
-RUN { \
-    echo "upload_max_filesize = 64M"; \
-    echo "post_max_size = 64M"; \
-    echo "memory_limit = 512M"; \
-    echo "max_execution_time = 300"; \
-    echo "max_input_time = 300"; \
-    echo "max_input_vars = 5000"; \
-    echo "max_file_uploads = 50"; \
-    } > /usr/local/etc/php/conf.d/uploads.ini
+# Копираме php.ini (лимити за качване)
+COPY ./roles/wp_stack/templates/php.ini /usr/local/etc/php/conf.d/uploads.ini
+
+WORKDIR /var/www/html
