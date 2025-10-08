@@ -1,4 +1,4 @@
-version: "3.8"
+version: '3.9'
 
 services:
   db:
@@ -7,9 +7,9 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: wordpress
-      MYSQL_USER: wordpress
-      MYSQL_PASSWORD: wordpresspass
+      MYSQL_DATABASE: wp
+      MYSQL_USER: wp
+      MYSQL_PASSWORD: StrongDBpass!
     volumes:
       - db_data:/var/lib/mysql
     networks:
@@ -21,50 +21,41 @@ services:
       timeout: 5s
 
   wordpress:
-    image: wordpress:latest
+    image: wordpress:php8.2-fpm
     container_name: my-wordpress-devops-project_wordpress
-    depends_on:
-      - db
     restart: always
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       WORDPRESS_DB_HOST: db:3306
-      WORDPRESS_DB_USER: wordpress
-      WORDPRESS_DB_PASSWORD: wordpresspass
-      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wp
+      WORDPRESS_DB_PASSWORD: StrongDBpass!
+      WORDPRESS_DB_NAME: wp
     volumes:
       - wordpress_data:/var/www/html
+      - ./wp-config.php:/var/www/html/wp-config.php
     networks:
       - wp_net
 
   nginx:
     image: nginx:alpine
     container_name: my-wordpress-devops-project_nginx
-    depends_on:
-      - wordpress
+    restart: always
     ports:
       - "8000:80"
     volumes:
-      - wordpress_data:/var/www/html:ro
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - wordpress_data:/var/www/html
+    depends_on:
+      - wordpress
     networks:
       - wp_net
 
-  mysqld_exporter:
-    image: prom/mysqld-exporter:latest
-    container_name: my-wordpress-devops-project_mysqld_exporter
-    restart: always
-    ports:
-      - "9104:9104"
-    volumes:
-      - ./.my.cnf:/root/.my.cnf:ro
-    depends_on:
-      - db
-    networks:
-      - wp_net
+networks:
+  wp_net:
+    driver: bridge
 
 volumes:
   db_data:
   wordpress_data:
-
-networks:
-  wp_net:
