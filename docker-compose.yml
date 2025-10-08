@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   db:
@@ -6,37 +6,33 @@ services:
     container_name: my-wordpress-devops-project_db
     restart: always
     environment:
-      MYSQL_DATABASE: wp
-      MYSQL_USER: wp
-      MYSQL_PASSWORD: StrongDBpass!
-      MYSQL_ROOT_PASSWORD: StrongDBpass!
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpresspass
     volumes:
       - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -pStrongDBpass! --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
     networks:
       - wp_net
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -prootpass || exit 1"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
 
   wordpress:
-    build:
-      context: .
-      dockerfile: Dockerfile.wordpress
+    image: wordpress:latest
     container_name: my-wordpress-devops-project_wordpress
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     restart: always
     environment:
-      WORDPRESS_DB_HOST: "db:3306"
-      WORDPRESS_DB_NAME: "wp"
-      WORDPRESS_DB_USER: "wp"
-      WORDPRESS_DB_PASSWORD: "StrongDBpass!"
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpresspass
+      WORDPRESS_DB_NAME: wordpress
     volumes:
       - wordpress_data:/var/www/html
-      - ./wp-config.php:/var/www/html/wp-config.php
     networks:
       - wp_net
 
@@ -48,8 +44,21 @@ services:
     ports:
       - "8000:80"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - wordpress_data:/var/www/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - wp_net
+
+  mysqld_exporter:
+    image: prom/mysqld-exporter:latest
+    container_name: my-wordpress-devops-project_mysqld_exporter
+    restart: always
+    ports:
+      - "9104:9104"
+    volumes:
+      - ./.my.cnf:/root/.my.cnf:ro
+    depends_on:
+      - db
     networks:
       - wp_net
 
