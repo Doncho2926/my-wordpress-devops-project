@@ -18,8 +18,8 @@ wp_table_prefix: wp_
 wp_admin_user: admin
 wp_admin_email: "doncho.donchev84@gmail.com"
 
-# Контейнер образи
-wordpress_image: "wordpress:php8.2-fpm"
+# Контейнер образи (🔧 сменяме тук!)
+wordpress_image: "my-wordpress:php8.2-fpm"   # 👈 локално билднат custom образ
 nginx_image: "nginx:alpine"
 mysql_image: "mysql:8.0"
 
