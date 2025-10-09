@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   db:
-    image: mysql:8.0
-    container_name: {{ project_name }}_db
+    image: "{{ mysql_image }}"
+    container_name: "{{ project_name }}_db"
     restart: always
     environment:
-      MYSQL_DATABASE: {{ wp_db_name }}
-      MYSQL_USER: {{ wp_db_user }}
-      MYSQL_PASSWORD: {{ vault_wp_db_password }}
-      MYSQL_ROOT_PASSWORD: {{ vault_wp_db_password }}
+      MYSQL_DATABASE: "{{ wp_db_name }}"
+      MYSQL_USER: "{{ wp_db_user }}"
+      MYSQL_PASSWORD: "{{ vault_wp_db_password }}"
+      MYSQL_ROOT_PASSWORD: "{{ vault_wp_db_password }}"
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -21,10 +21,8 @@ services:
       - wp_net
 
   wordpress:
-    build:
-      context: .
-      dockerfile: Dockerfile.wordpress
-    container_name: {{ project_name }}_wordpress
+    image: "my-wordpress:php8.2-fpm"    # 👈 Използваме вече билднатия от Ansible образ
+    container_name: "{{ project_name }}_wordpress"
     depends_on:
       db:
         condition: service_healthy
@@ -41,8 +39,8 @@ services:
       - wp_net
 
   nginx:
-    image: nginx:alpine
-    container_name: {{ project_name }}_nginx
+    image: "{{ nginx_image }}"
+    container_name: "{{ project_name }}_nginx"
     depends_on:
       - wordpress
     ports:
