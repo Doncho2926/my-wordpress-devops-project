@@ -53,3 +53,13 @@
   register: wp_install
   failed_when: false
   changed_when: "'Success:' in wp_install.stdout or 'WordPress is already installed.' in wp_install.stdout"
+
+  # 🧩 Oсигурява права за качване на изображения
+- name: Осигури права върху wp-content/uploads
+  ansible.builtin.command: >
+    docker exec -u root {{ project_name }}_wordpress
+    bash -c "mkdir -p /var/www/html/wp-content/uploads &&
+             chown -R www-data:www-data /var/www/html/wp-content &&
+             chmod -R 755 /var/www/html/wp-content"
+  args:
+    chdir: "{{ project_dir }}"
