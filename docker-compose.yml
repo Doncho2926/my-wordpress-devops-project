@@ -33,6 +33,7 @@ services:
     volumes:
       - wordpress_data:/var/www/html
       - ./wp-config.php:/var/www/html/wp-config.php
+      - ./php.ini:/usr/local/etc/php/conf.d/zz-uploads.ini   # ✅ php.ini се монтира динамично
     networks:
       - wp_net
 
