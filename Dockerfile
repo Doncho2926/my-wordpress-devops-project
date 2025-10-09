@@ -4,7 +4,7 @@ FROM wordpress:php8.2-fpm
 # Работна директория
 WORKDIR /var/www/html
 
-# Инсталираме нужните зависимости и PHP разширения
+# Инсталираме нужните зависимости и PHP разширения (включително Imagick)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         apt-utils \
         pkg-config \
@@ -15,8 +15,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libzip-dev \
         zip \
         unzip \
+        imagemagick \
+        libmagickwand-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install gd mysqli zip opcache fileinfo exif \
+    && pecl install imagick \
+    && docker-php-ext-enable imagick \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # ✅ Копираме персонализирания php.ini (от корена на проекта)

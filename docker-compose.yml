@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   db:
-    image: mysql:8.0
-    container_name: my-wordpress-devops-project_db
+    image: "mysql:8.0"
+    container_name: "my-wordpress-devops-project_db"
     restart: always
     environment:
-      MYSQL_DATABASE: wp
-      MYSQL_USER: wp
-      MYSQL_PASSWORD: StrongDBpass!
-      MYSQL_ROOT_PASSWORD: StrongDBpass!
+      MYSQL_DATABASE: "wp"
+      MYSQL_USER: "wp"
+      MYSQL_PASSWORD: "StrongDBpass!"
+      MYSQL_ROOT_PASSWORD: "StrongDBpass!"
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -21,10 +21,8 @@ services:
       - wp_net
 
   wordpress:
-    build:
-      context: .
-      dockerfile: Dockerfile.wordpress
-    container_name: my-wordpress-devops-project_wordpress
+    image: "my-wordpress:php8.2-fpm"    # 👈 Използваме вече билднатия от Ansible образ
+    container_name: "my-wordpress-devops-project_wordpress"
     depends_on:
       db:
         condition: service_healthy
@@ -41,8 +39,8 @@ services:
       - wp_net
 
   nginx:
-    image: nginx:alpine
-    container_name: my-wordpress-devops-project_nginx
+    image: "nginx:alpine"
+    container_name: "my-wordpress-devops-project_nginx"
     depends_on:
       - wordpress
     ports:
