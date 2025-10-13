@@ -1,3 +1,52 @@
+name: Deploy WordPress Stack
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y software-properties-common ca-certificates curl gnupg lsb-release
+          sudo add-apt-repository --yes --update ppa:ansible/ansible
+          sudo apt-get install -y ansible
+          
+          # Install Docker
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh get-docker.sh
+          sudo systemctl start docker
+          
+          # Install Docker Compose
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          
+          docker --version
+          docker-compose version
+
+      - name: Set up inventory
+        run: |
+          echo "[webservers]" > inventory.ini
+          echo "localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3" >> inventory.ini
+
+      # ✅ Първо правим синтактична проверка и dry-run
+      - name: Lint and dry-run Ansible
+        run: |
+          ansible-playbook -i inventory.ini site.yml --syntax-check
+          ansible-playbook -i inventory.ini site.yml --check
+
+      # ✅ След това правим реалния deploy
       - name: Run Ansible playbook (ignore docker compose errors in CI)
         run: |
           ansible-playbook -i inventory.ini site.yml || echo "⚠️ Docker Compose failed in CI — ignoring for now"
@@ -7,6 +56,7 @@
           WP_SALTS: ${{ secrets.WP_SALTS }}
           ANSIBLE_FORCE_COLOR: "true"
 
+      # ✅ И накрая показваме статус на контейнерите
       - name: Show running Docker containers
         run: |
           echo "=== Docker Containers Status ==="
