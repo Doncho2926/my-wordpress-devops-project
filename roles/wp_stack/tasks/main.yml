@@ -1,4 +1,6 @@
 ---
+# WordPress DevOps Stack — stable & CI-compatible
+
 - name: Ensure project directory exists
   ansible.builtin.file:
     path: "{{ project_dir }}"
@@ -38,7 +40,7 @@
   ansible.builtin.debug:
     msg: "Project directory path is: {{ project_dir }}"
 
-- name: Set vm.max_map_count
+- name: Set vm.max_map_count for Elasticsearch
   ansible.posix.sysctl:
     name: vm.max_map_count
     value: "262144"
@@ -55,6 +57,7 @@
     chdir: "{{ project_dir }}"
   register: docker_build
   failed_when: docker_build.rc != 0
+  check_mode: no  # ✅ build трябва винаги да се изпълнява дори при dry-run
 
 - name: Start containers with Docker Compose
   ansible.builtin.command:
@@ -63,6 +66,7 @@
     chdir: "{{ project_dir }}"
   register: compose_up
   failed_when: compose_up.rc != 0
+  check_mode: no  # ✅ изпълнява се реално, дори в CI check mode
 
 - name: Wait for MySQL to become healthy
   ansible.builtin.shell: |
@@ -71,3 +75,15 @@
   until: db_health.stdout == "healthy"
   retries: 30
   delay: 5
+  check_mode: no  # ✅ задължително за GitHub Actions
+
+- name: Show container status
+  ansible.builtin.command: docker ps -a
+  register: docker_status
+  changed_when: false
+  check_mode: no
+
+- name: Print container status
+  ansible.builtin.debug:
+    msg: "{{ docker_status.stdout_lines }}"
+  check_mode: no
