@@ -1,15 +1,15 @@
-# roles/wp_stack/files/docker-compose.yml.j2
+version: "3.9"
 
 services:
   db:
-    image: "mysql:8.0"
+    image: mysql:8.0
     container_name: "{{ project_name }}_db"
     restart: always
     environment:
-      MYSQL_DATABASE: "wp"
-      MYSQL_USER: "wp"
-      MYSQL_PASSWORD: "StrongDBpass!"
-      MYSQL_ROOT_PASSWORD: "StrongDBpass!"
+      MYSQL_DATABASE: wp
+      MYSQL_USER: wp
+      MYSQL_PASSWORD: StrongDBpass!
+      MYSQL_ROOT_PASSWORD: StrongDBpass!
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
@@ -21,17 +21,17 @@ services:
       - wp_net
 
   wordpress:
-    image: "my-wordpress:php8.2-fpm"
+    image: my-wordpress:php8.2-fpm
     container_name: "{{ project_name }}_wordpress"
     depends_on:
       db:
         condition: service_healthy
     restart: always
     environment:
-      WORDPRESS_DB_HOST: "db:3306"
-      WORDPRESS_DB_NAME: "wp"
-      WORDPRESS_DB_USER: "wp"
-      WORDPRESS_DB_PASSWORD: "StrongDBpass!"
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: wp
+      WORDPRESS_DB_USER: wp
+      WORDPRESS_DB_PASSWORD: StrongDBpass!
     volumes:
       - wordpress_data:/var/www/html
       - ./wp-config.php:/var/www/html/wp-config.php
@@ -39,7 +39,7 @@ services:
       - wp_net
 
   nginx:
-    image: "nginx:alpine"
+    image: nginx:alpine
     container_name: "{{ project_name }}_nginx"
     depends_on:
       - wordpress
@@ -85,24 +85,24 @@ services:
     networks:
       - wp_net
 
-   # --- ELK добавки ---
+  # --- ELK stack ---
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
     container_name: "{{ project_name }}_elasticsearch"
     environment:
       - discovery.type=single-node
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
     ports:
       - "9200:9200"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
-      interval: 15s
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 20s
       timeout: 10s
-      retries: 20
+      retries: 30
     networks:
       - wp_net
-
-
 
   logstash:
     image: docker.elastic.co/logstash/logstash:8.14.0
@@ -116,8 +116,7 @@ services:
       - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
       - nginx_logs:/var/log/nginx:ro
     ports:
-      - "9600:9600"   # Logstash API (по избор)
-      # - "5044:5044" # Beats input (ако добавим Filebeat в бъдеще)
+      - "9600:9600"
     networks:
       - wp_net
 
@@ -129,18 +128,16 @@ services:
         condition: service_healthy
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-      # DEV: security е OFF в ES → не са нужни креденшъли
     ports:
       - "5601:5601"
     networks:
       - wp_net
-  # --- край ELK добавки ---
 
 volumes:
   db_data:
   wordpress_data:
-  es_data:
   nginx_logs:
+  es_data:
 
 networks:
   wp_net:

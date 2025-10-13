@@ -1,15 +1,11 @@
 ---
-# WordPress DevOps Stack — stable version (CI + local)
-
-# 1️⃣ Увери се, че директорията за проекта съществува
 - name: Ensure project directory exists
   ansible.builtin.file:
     path: "{{ project_dir }}"
     state: directory
-    mode: '0755'
+    mode: "0755"
 
-# 2️⃣ (По избор) Клонирай последните промени от GitHub, ако е зададен repo URL
-- name: Clone or update GitHub repository (optional)
+- name: Clone or update GitHub repository
   ansible.builtin.git:
     repo: "{{ github_repo_url }}"
     dest: "{{ project_dir }}"
@@ -17,7 +13,6 @@
     force: yes
   when: github_repo_url is defined and github_repo_url != ""
 
-# 3️⃣ Копирай всички нужни файлове в project_dir
 - name: Copy static files
   ansible.builtin.copy:
     src: "{{ item }}"
@@ -29,8 +24,7 @@
     - "prometheus.yml"
     - "logstash.conf"
 
-# 4️⃣ Копирай шаблоните за docker-compose и nginx
-- name: Copy docker-compose and nginx templates
+- name: Copy templates
   ansible.builtin.template:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
@@ -38,16 +32,13 @@
   loop:
     - { src: "docker-compose.yml.j2", dest: "{{ project_dir }}/docker-compose.yml" }
     - { src: "nginx.conf.j2", dest: "{{ project_dir }}/nginx.conf" }
+    - { src: "wp-config.php.j2", dest: "{{ project_dir }}/wp-config.php" }
 
-# 5️⃣ Генерирай wp-config.php
-- name: Generate wp-config.php
-  ansible.builtin.template:
-    src: "wp-config.php.j2"
-    dest: "{{ project_dir }}/wp-config.php"
-    mode: "0644"
+- name: Debug project_dir path
+  ansible.builtin.debug:
+    msg: "Project directory path is: {{ project_dir }}"
 
-# 6️⃣ Увеличи vm.max_map_count (за Elasticsearch)
-- name: Increase vm.max_map_count for Elasticsearch
+- name: Set vm.max_map_count
   ansible.posix.sysctl:
     name: vm.max_map_count
     value: "262144"
@@ -57,32 +48,22 @@
   become: true
   ignore_errors: true
 
-# 7️⃣ Debug (покажи реалния път на project_dir в лога)
-- name: Show project_dir path
-  ansible.builtin.debug:
-    msg: "Project directory path is: {{ project_dir }}"
-
-# 8️⃣ Билдни custom WordPress image
-- name: Build custom WordPress image with PHP extensions
+- name: Build custom WordPress image
   ansible.builtin.command:
     cmd: docker build -t my-wordpress:php8.2-fpm .
   args:
     chdir: "{{ project_dir }}"
   register: docker_build
   failed_when: docker_build.rc != 0
-  ignore_errors: false
 
-# 9️⃣ Стартирай всички контейнери
-- name: Start containers with Docker Compose (rebuild)
+- name: Start containers with Docker Compose
   ansible.builtin.command:
     cmd: docker compose -f {{ project_dir }}/docker-compose.yml up -d --build
   args:
     chdir: "{{ project_dir }}"
   register: compose_up
   failed_when: compose_up.rc != 0
-  ignore_errors: false
 
-# 🔟 Изчакай MySQL да стане healthy
 - name: Wait for MySQL to become healthy
   ansible.builtin.shell: |
     docker inspect --format='{{"{{.State.Health.Status}}"}}' {{ project_name }}_db
@@ -90,14 +71,3 @@
   until: db_health.stdout == "healthy"
   retries: 30
   delay: 5
-  ignore_errors: true
-
-# 11️⃣ Покажи статус на контейнерите
-- name: Show Docker containers status
-  ansible.builtin.command: docker ps -a
-  register: docker_status
-  changed_when: false
-
-- name: Print Docker status
-  ansible.builtin.debug:
-    var: docker_status.stdout_lines
