@@ -1,5 +1,5 @@
 ---
-# WordPress DevOps Stack - Main Ansible Tasks
+# WordPress DevOps Stack - Main Ansible Tasks (финална версия)
 
 - name: Ensure project directory exists
   ansible.builtin.file:
@@ -7,13 +7,17 @@
     state: directory
     mode: '0755'
 
-- name: Clone project from GitHub (if provided)
-  ansible.builtin.git:
-    repo: "{{ github_repo_url | default('', true) }}"
-    dest: "{{ project_dir }}"
-    version: main
-    force: yes
-  when: github_repo_url is defined and github_repo_url != ""
+- name: Copy all required role files into project directory
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ project_dir }}/"
+    mode: "0644"
+  loop:
+    - "Dockerfile"
+    - "php.ini"
+    - "prometheus.yml"
+    - "logstash.conf"
+  ignore_errors: true
 
 - name: Copy docker-compose and nginx templates
   ansible.builtin.template:
@@ -30,13 +34,6 @@
     dest: "{{ project_dir }}/wp-config.php"
     mode: "0644"
 
-- name: Copy Logstash pipeline configuration
-  ansible.builtin.copy:
-    src: "logstash.conf"
-    dest: "{{ project_dir }}/logstash.conf"
-    mode: "0644"
-  ignore_errors: true
-
 - name: Increase vm.max_map_count for Elasticsearch
   ansible.posix.sysctl:
     name: vm.max_map_count
@@ -47,17 +44,6 @@
   become: true
   ignore_errors: true
 
-- name: Copy role files to project directory
-  ansible.builtin.copy:
-    src: "{{ item }}"
-    dest: "{{ project_dir }}/"
-    mode: "0644"
-  loop:
-    - "Dockerfile"
-    - "php.ini"
-    - "prometheus.yml"
-  ignore_errors: true
-
 - name: Build custom WordPress image with PHP extensions
   ansible.builtin.command:
     cmd: docker build -t my-wordpress:php8.2-fpm .
@@ -66,47 +52,11 @@
   register: docker_build
   failed_when: docker_build.rc != 0 and
                'No such file or directory' not in docker_build.msg
-  ignore_errors: true
+  ignore_errors: false
 
 - name: Start containers with Docker Compose (rebuild)
   ansible.builtin.command:
-    cmd: docker compose -f /opt/wordpress/docker-compose.yml up -d --build
+    cmd: docker compose -f {{ project_dir }}/docker-compose.yml up -d --build
   args:
     chdir: "{{ project_dir }}"
-  ignore_errors: true
-
-- name: Wait for MySQL to become healthy
-  ansible.builtin.shell: |
-    docker inspect --format='{{"{{.State.Health.Status}}"}}' {{ project_name }}_db
-  register: db_health
-  until: db_health.stdout == "healthy"
-  retries: 30
-  delay: 5
-  ignore_errors: true
-
-- name: Install WordPress via WP-CLI (if not installed)
-  ansible.builtin.command: >
-    docker exec -u www-data {{ project_name }}_wordpress
-    wp core install
-    --url="{{ wp_site_url }}"
-    --title="{{ wp_site_title }}"
-    --admin_user="{{ wp_admin_user }}"
-    --admin_password="{{ vault_wp_admin_password }}"
-    --admin_email="{{ wp_admin_email }}"
-    --path=/var/www/html
-  args:
-    chdir: "{{ project_dir }}"
-    creates: /var/www/html/wp-content
-  register: wp_install
-  failed_when: false
-  changed_when: "'Success:' in wp_install.stdout or
-                 'WordPress is already installed.' in wp_install.stdout"
-  ignore_errors: true
-
-- name: Ensure correct permissions for wp-content/uploads
-  ansible.builtin.command: >
-    docker exec -u root {{ project_name }}_wordpress
-    bash -c "mkdir -p /var/www/html/wp-content/uploads &&
-             chown -R www-data:www-data /var/www/html/wp-content &&
-             chmod -R 755 /var/www/html/wp-content"
-  ignore_errors: true
+  ignore_errors: false
