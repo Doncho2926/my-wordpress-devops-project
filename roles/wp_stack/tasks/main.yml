@@ -54,9 +54,12 @@
                'No such file or directory' not in docker_build.msg
   ignore_errors: false
 
+# ⚙️ Ето къде беше грешката: използвай project_dir, не /opt/wordpress
 - name: Start containers with Docker Compose (rebuild)
   ansible.builtin.command:
     cmd: docker compose -f {{ project_dir }}/docker-compose.yml up -d --build
   args:
     chdir: "{{ project_dir }}"
+  register: compose_up
+  failed_when: compose_up.rc != 0
   ignore_errors: false
