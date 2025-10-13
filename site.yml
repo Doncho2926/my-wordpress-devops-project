@@ -6,7 +6,7 @@
     project_name: my-wordpress-devops-project
 
     # Ако има /opt/wordpress → ползвай го; иначе fallback към playbook_dir
-    project_dir: "{{ '/opt/wordpress' if (lookup('ansible.builtin.fileglob', '/opt/wordpress', errors='ignore')) else playbook_dir + '/wordpress' }}"
+    project_dir: "{{ lookup('env', 'GITHUB_WORKSPACE') | default('/opt/wordpress', true) }}/wordpress"
 
     wp_site_url: "http://localhost:8000"
     wp_site_title: "My WordPress DevOps Site"
