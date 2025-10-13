@@ -85,22 +85,31 @@ services:
     networks:
       - wp_net
 
-  # --- ELK stack ---
+  # === FIXED ELASTICSEARCH CONFIG ===
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
     container_name: "{{ project_name }}_elasticsearch"
     environment:
       - discovery.type=single-node
+      - bootstrap.memory_lock=true
       - xpack.security.enabled=false
       - xpack.security.http.ssl.enabled=false
-      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+      - xpack.security.transport.ssl.enabled=false
+      - action.destructive_requires_name=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
     ports:
       - "9200:9200"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health >/dev/null || exit 1"]
+      # ✅ Използваме HTTPS и игнорираме сертификата
+      test: ["CMD-SHELL", "curl -k -fs https://localhost:9200 >/dev/null || exit 1"]
       interval: 20s
       timeout: 10s
       retries: 30
+      start_period: 40s
     networks:
       - wp_net
 
@@ -127,7 +136,8 @@ services:
       elasticsearch:
         condition: service_healthy
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+      - ELASTICSEARCH_SSL_VERIFICATIONMODE=none
     ports:
       - "5601:5601"
     networks:
