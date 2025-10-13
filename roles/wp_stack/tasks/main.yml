@@ -1,110 +1,39 @@
----
-# 🧱 WordPress DevOps Stack - Main Ansible Tasks
-
-# 1️⃣ Увери се, че целевата директория съществува
-- name: Ensure project directory exists
-  ansible.builtin.file:
-    path: "{{ project_dir }}"
-    state: directory
-    mode: '0755'
-
-# 2️⃣ Клонирай проекта от GitHub (ако има репо зададено)
-- name: Клонирай проекта от GitHub (ако има репо)
-  ansible.builtin.git:
-    repo: "{{ github_repo_url | default('', true) }}"
-    dest: "{{ project_dir }}"
-    version: main
-    force: yes
-  when: github_repo_url is defined and github_repo_url != ""
-
-# 3️⃣ Копирай шаблоните за docker-compose и nginx
-- name: Копирай шаблоните на docker-compose и nginx
-  ansible.builtin.template:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
-    mode: "0644"
-  loop:
-    - { src: "docker-compose.yml.j2", dest: "{{ project_dir }}/docker-compose.yml" }
-    - { src: "nginx.conf.j2", dest: "{{ project_dir }}/nginx.conf" }
-
-# 4️⃣ Генерирай wp-config.php от шаблон
-- name: Генерирай wp-config.php от шаблон
-  ansible.builtin.template:
-    src: "wp-config.php.j2"
-    dest: "{{ project_dir }}/wp-config.php"
-    mode: "0644"
-
-# 5️⃣ Копирай logstash pipeline конфигурацията (ако я има)
-- name: Копирай logstash pipeline конфигурацията
-  ansible.builtin.copy:
-    src: "logstash.conf"
-    dest: "{{ project_dir }}/logstash.conf"
-    mode: "0644"
-  ignore_errors: true  # безопасно, ако файлът липсва
-
-# 6️⃣ Увеличи vm.max_map_count за Elasticsearch
-- name: Увеличи vm.max_map_count за Elasticsearch
-  ansible.posix.sysctl:
-    name: vm.max_map_count
-    value: "262144"
-    sysctl_set: true
-    state: present
-    reload: true
-  become: true
-  ignore_errors: true  # безопасно за CI
-
-# 7️⃣ Build custom WordPress image с нужните PHP разширения
-- name: Build custom WordPress image with PHP extensions
-  ansible.builtin.command:
-    cmd: docker build -t my-wordpress:php8.2-fpm .
-  args:
-    chdir: "{{ project_dir }}"
-  register: docker_build
-  failed_when: docker_build.rc != 0 and 'No such file or directory' not in docker_build.msg
-  ignore_errors: true  # предотвратява fail при CI
-
-# 8️⃣ Стартирай контейнерите с Docker Compose (с rebuild)
-- name: Стартирай контейнерите с Docker Compose (с rebuild)
-  ansible.builtin.command:
-    cmd: docker compose -f /opt/wordpress/docker-compose.yml up -d --build
-  args:
-    chdir: "{{ project_dir }}"
-  ignore_errors: true  # CI-safe
-
-# 9️⃣ Изчакай MySQL да стане healthy
-- name: Изчакай MySQL да стане healthy
-  ansible.builtin.shell: |
-    docker inspect --format='{{"{{.State.Health.Status}}"}}' {{ project_name }}_db
-  register: db_health
-  until: db_health.stdout == "healthy"
-  retries: 30
-  delay: 5
-  ignore_errors: true  # няма да блокира CI
-
-# 🔟 Инсталирай WordPress чрез WP-CLI (ако не е инсталиран)
-- name: Инсталирай WordPress чрез WP-CLI (ако не е инсталиран)
-  ansible.builtin.command: >
-    docker exec -u www-data {{ project_name }}_wordpress
-    wp core install
-    --url="{{ wp_site_url }}"
-    --title="{{ wp_site_title }}"
-    --admin_user="{{ wp_admin_user }}"
-    --admin_password="{{ vault_wp_admin_password }}"
-    --admin_email="{{ wp_admin_email }}"
-    --path=/var/www/html
-  args:
-    chdir: "{{ project_dir }}"
-    creates: /var/www/html/wp-content
-  register: wp_install
-  failed_when: false
-  changed_when: "'Success:' in wp_install.stdout or 'WordPress is already installed.' in wp_install.stdout"
-  ignore_errors: true
-
-# 11️⃣ Осигури права върху wp-content/uploads
-- name: Осигури права върху wp-content/uploads
-  ansible.builtin.command: >
-    docker exec -u root {{ project_name }}_wordpress
-    bash -c "mkdir -p /var/www/html/wp-content/uploads &&
-             chown -R www-data:www-data /var/www/html/wp-content &&
-             chmod -R 755 /var/www/html/wp-content"
-  ignore_errors: true
+2m 46s
+Run ansible-playbook -i inventory.ini site.yml --syntax-check
+  
+playbook: site.yml
+PLAY [Deploy WordPress via role] ***********************************************
+TASK [Gathering Facts] *********************************************************
+ok: [localhost]
+TASK [wp_stack : Ensure project directory exists] ******************************
+changed: [localhost]
+TASK [wp_stack : Клонирай проекта от GitHub (ако има репо)] ********************
+changed: [localhost]
+TASK [wp_stack : Копирай шаблоните на docker-compose и nginx] ******************
+changed: [localhost] => (item={'src': 'docker-compose.yml.j2', 'dest': '/opt/wordpress/docker-compose.yml'})
+changed: [localhost] => (item={'src': 'nginx.conf.j2', 'dest': '/opt/wordpress/nginx.conf'})
+TASK [wp_stack : Генерирай wp-config.php от шаблон] ****************************
+changed: [localhost]
+TASK [wp_stack : Копирай logstash pipeline конфигурацията] *********************
+changed: [localhost]
+TASK [wp_stack : Увеличи vm.max_map_count за Elasticsearch] ********************
+ok: [localhost]
+TASK [wp_stack : Build custom WordPress image with PHP extensions] *************
+Error: : Task failed: Module failed: Unable to change directory before execution: [Errno 2] No such file or directory: b'/opt/wordpress'
+Origin: /home/runner/work/my-wordpress-devops-project/my-wordpress-devops-project/roles/wp_stack/tasks/main.yml:57:3
+55
+56 # 7️⃣ Build custom WordPress image с нужните PHP разширения
+57 - name: Build custom WordPress image with PHP extensions
+     ^ column 3
+fatal: [localhost]: FAILED! => {"changed": false, "cmd": ["docker", "build", "-t", "my-wordpress:php8.2-fpm", "."], "delta": null, "end": null, "failed_when_result": true, "msg": "Unable to change directory before execution.", "rc": null, "start": null, "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+...ignoring
+TASK [wp_stack : Стартирай контейнерите с Docker Compose (с rebuild)] **********
+Error: : Task failed: Module failed: Unable to change directory before execution: [Errno 2] No such file or directory: b'/opt/wordpress'
+Origin: /home/runner/work/my-wordpress-devops-project/my-wordpress-devops-project/roles/wp_stack/tasks/main.yml:67:3
+65
+66 # 8️⃣ Стартирай контейнерите с Docker Compose (с rebuild)
+67 - name: Стартирай контейнерите с Docker Compose (с rebuild)
+     ^ column 3
+fatal: [localhost]: FAILED! => {"changed": false, "cmd": ["docker", "compose", "-f", "/opt/wordpress/docker-compose.yml", "up", "-d", "--build"], "delta": null, "end": null, "msg": "Unable to change directory before execution.", "rc": null, "start": null, "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+...ignoring
+TASK [wp_stack : Изчакай MySQL да стане healthy] *******************************
