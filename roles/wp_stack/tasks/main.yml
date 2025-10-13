@@ -1,5 +1,5 @@
 ---
-# WordPress DevOps Stack — стабилна версия (с ELK)
+# WordPress DevOps Stack — stable version (CI + local)
 
 # 1️⃣ Увери се, че директорията за проекта съществува
 - name: Ensure project directory exists
@@ -8,8 +8,17 @@
     state: directory
     mode: '0755'
 
-# 2️⃣ Копирай статичните файлове (Dockerfile, php.ini, Prometheus, Logstash)
-- name: Copy static files to project directory
+# 2️⃣ (По избор) Клонирай последните промени от GitHub, ако е зададен repo URL
+- name: Clone or update GitHub repository (optional)
+  ansible.builtin.git:
+    repo: "{{ github_repo_url }}"
+    dest: "{{ project_dir }}"
+    version: main
+    force: yes
+  when: github_repo_url is defined and github_repo_url != ""
+
+# 3️⃣ Копирай всички нужни файлове в project_dir
+- name: Copy all static files to project directory
   ansible.builtin.copy:
     src: "{{ item }}"
     dest: "{{ project_dir }}/{{ item }}"
@@ -20,7 +29,7 @@
     - "prometheus.yml"
     - "logstash.conf"
 
-# 3️⃣ Копирай шаблоните docker-compose и nginx
+# 4️⃣ Копирай шаблоните за docker-compose и nginx
 - name: Copy docker-compose and nginx templates
   ansible.builtin.template:
     src: "{{ item.src }}"
@@ -30,14 +39,14 @@
     - { src: "docker-compose.yml.j2", dest: "{{ project_dir }}/docker-compose.yml" }
     - { src: "nginx.conf.j2", dest: "{{ project_dir }}/nginx.conf" }
 
-# 4️⃣ Генерирай wp-config.php от шаблон
+# 5️⃣ Генерирай wp-config.php
 - name: Generate wp-config.php
   ansible.builtin.template:
     src: "wp-config.php.j2"
     dest: "{{ project_dir }}/wp-config.php"
     mode: "0644"
 
-# 5️⃣ Настрой vm.max_map_count (необходимо за Elasticsearch)
+# 6️⃣ Увеличи vm.max_map_count (за Elasticsearch)
 - name: Increase vm.max_map_count for Elasticsearch
   ansible.posix.sysctl:
     name: vm.max_map_count
@@ -48,7 +57,7 @@
   become: true
   ignore_errors: true
 
-# 6️⃣ Build custom WordPress image
+# 7️⃣ Билдни custom WordPress image
 - name: Build custom WordPress image with PHP extensions
   ansible.builtin.command:
     cmd: docker build -t my-wordpress:php8.2-fpm .
@@ -56,8 +65,9 @@
     chdir: "{{ project_dir }}"
   register: docker_build
   failed_when: docker_build.rc != 0
+  ignore_errors: false
 
-# 7️⃣ Стартирай контейнерите
+# 8️⃣ Стартирай всички контейнери
 - name: Start containers with Docker Compose (rebuild)
   ansible.builtin.command:
     cmd: docker compose -f {{ project_dir }}/docker-compose.yml up -d --build
@@ -65,3 +75,14 @@
     chdir: "{{ project_dir }}"
   register: compose_up
   failed_when: compose_up.rc != 0
+  ignore_errors: false
+
+# 9️⃣ Изчакай MySQL да стане healthy
+- name: Wait for MySQL to become healthy
+  ansible.builtin.shell: |
+    docker inspect --format='{{"{{.State.Health.Status}}"}}' {{ project_name }}_db
+  register: db_health
+  until: db_health.stdout == "healthy"
+  retries: 30
+  delay: 5
+  ignore_errors: true
