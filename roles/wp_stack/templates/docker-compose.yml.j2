@@ -85,8 +85,8 @@ services:
     networks:
       - wp_net
 
-  # --- ELK добавки ---
-    elasticsearch:
+   # --- ELK добавки ---
+  elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
     container_name: "{{ project_name }}_elasticsearch"
     environment:
@@ -101,6 +101,7 @@ services:
       retries: 20
     networks:
       - wp_net
+
 
 
   logstash:
