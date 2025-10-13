@@ -7,7 +7,7 @@
     github_repo_url: "https://github.com/Doncho2926/my-wordpress-devops-project.git"
 
     # Работи и локално, и в GitHub Actions
-    project_dir: "{{ lookup('env', 'GITHUB_WORKSPACE') | default('/opt/wordpress', true) }}/wordpress"
+    project_dir: "{{ playbook_dir }}/wordpress"
 
     wp_site_url: "http://localhost:8000"
     wp_site_title: "My WordPress DevOps Site"

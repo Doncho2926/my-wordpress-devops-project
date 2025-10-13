@@ -18,7 +18,7 @@
   when: github_repo_url is defined and github_repo_url != ""
 
 # 3️⃣ Копирай всички нужни файлове в project_dir
-- name: Copy all static files to project directory
+- name: Copy static files
   ansible.builtin.copy:
     src: "{{ item }}"
     dest: "{{ project_dir }}/{{ item }}"
@@ -57,7 +57,12 @@
   become: true
   ignore_errors: true
 
-# 7️⃣ Билдни custom WordPress image
+# 7️⃣ Debug (покажи реалния път на project_dir в лога)
+- name: Show project_dir path
+  ansible.builtin.debug:
+    msg: "Project directory path is: {{ project_dir }}"
+
+# 8️⃣ Билдни custom WordPress image
 - name: Build custom WordPress image with PHP extensions
   ansible.builtin.command:
     cmd: docker build -t my-wordpress:php8.2-fpm .
@@ -67,7 +72,7 @@
   failed_when: docker_build.rc != 0
   ignore_errors: false
 
-# 8️⃣ Стартирай всички контейнери
+# 9️⃣ Стартирай всички контейнери
 - name: Start containers with Docker Compose (rebuild)
   ansible.builtin.command:
     cmd: docker compose -f {{ project_dir }}/docker-compose.yml up -d --build
@@ -77,7 +82,7 @@
   failed_when: compose_up.rc != 0
   ignore_errors: false
 
-# 9️⃣ Изчакай MySQL да стане healthy
+# 🔟 Изчакай MySQL да стане healthy
 - name: Wait for MySQL to become healthy
   ansible.builtin.shell: |
     docker inspect --format='{{"{{.State.Health.Status}}"}}' {{ project_name }}_db
@@ -86,3 +91,13 @@
   retries: 30
   delay: 5
   ignore_errors: true
+
+# 11️⃣ Покажи статус на контейнерите
+- name: Show Docker containers status
+  ansible.builtin.command: docker ps -a
+  register: docker_status
+  changed_when: false
+
+- name: Print Docker status
+  ansible.builtin.debug:
+    var: docker_status.stdout_lines

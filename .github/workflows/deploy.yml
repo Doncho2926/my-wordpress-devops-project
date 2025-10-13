@@ -13,45 +13,63 @@ jobs:
         working-directory: ./
 
     steps:
+      # 1️⃣ Клонирай репото
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Инсталирай зависимости (Ansible + Docker + Compose)
       - name: Install dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y software-properties-common ca-certificates curl gnupg lsb-release
           sudo add-apt-repository --yes --update ppa:ansible/ansible
           sudo apt-get install -y ansible
-          
+
           # Install Docker
           curl -fsSL https://get.docker.com -o get-docker.sh
           sudo sh get-docker.sh
           sudo systemctl start docker
-          
-          # Install Docker Compose
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          
-          docker --version
-          docker-compose version
 
-      - name: Set up inventory
+          # Install Docker Compose plugin (v2)
+          DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+          mkdir -p $DOCKER_CONFIG/cli-plugins
+          curl -SL https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+          chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+
+          docker --version
+          docker compose version
+
+      # 3️⃣ Подготви Ansible inventory
+      - name: Set up Ansible inventory
         run: |
           echo "[webservers]" > inventory.ini
           echo "localhost ansible_connection=local ansible_python_interpreter=/usr/bin/python3" >> inventory.ini
 
-      # Тази стъпка проверява синтаксиса и dry-run без да стартира контейнери
+      # 4️⃣ Проверка за синтаксис и dry-run
       - name: Lint and dry-run Ansible
         run: |
           ansible-playbook -i inventory.ini site.yml --syntax-check
           ansible-playbook -i inventory.ini site.yml --check
+        env:
+          ANSIBLE_FORCE_COLOR: "true"
+          GITHUB_WORKSPACE: ${{ github.workspace }}
 
-      # Това е реалният deploy, но ще игнорира Docker Compose грешки
-      - name: Run Ansible playbook (ignore docker compose errors in CI)
+      # 5️⃣ Реален deploy
+      - name: Run Ansible playbook
         run: |
-          ansible-playbook -i inventory.ini site.yml || echo "⚠️ Docker Compose failed in CI — ignoring for now"
+          ansible-playbook -i inventory.ini site.yml
         env:
           WP_DB_PASSWORD: ${{ secrets.WP_DB_PASSWORD }}
           WP_ADMIN_PASSWORD: ${{ secrets.WP_ADMIN_PASSWORD }}
           WP_SALTS: ${{ secrets.WP_SALTS }}
           ANSIBLE_FORCE_COLOR: "true"
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+
+      # 6️⃣ Покажи логовете на контейнерите (ако има проблем)
+      - name: Show running containers
+        if: always()
+        run: |
+          echo "=== Docker containers ==="
+          docker ps -a || true
+          echo "=== Docker logs (WordPress) ==="
+          docker logs my-wordpress-devops-project_wordpress || true
