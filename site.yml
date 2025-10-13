@@ -4,9 +4,7 @@
   become: true
   vars:
     project_name: my-wordpress-devops-project
-
-    # Работи и локално, и в GitHub Actions
-    project_dir: "{{ playbook_dir }}/wordpress"
+    project_dir: /opt/wordpress
 
     wp_site_url: "http://localhost:8000"
     wp_site_title: "My WordPress DevOps Site"
