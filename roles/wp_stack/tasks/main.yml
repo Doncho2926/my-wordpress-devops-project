@@ -1,5 +1,17 @@
 ---
-# Основни задачи за WordPress Docker стек
+# roles/wp_stack/tasks/main.yml
+# Главен playbook за автоматизация на WordPress DevOps стека
+# Включва Docker, Ansible, мониторинг и ELK логинг
+
+- name: Увеличи vm.max_map_count за Elasticsearch
+  ansible.posix.sysctl:
+    name: vm.max_map_count
+    value: "262144"
+    sysctl_set: true
+    state: present
+    reload: true
+  become: true
+  tags: elk
 
 - name: Клонирай проекта от GitHub (ако има репо)
   ansible.builtin.git:
@@ -8,6 +20,7 @@
     version: main
     force: yes
   when: github_repo_url is defined and github_repo_url != ""
+  tags: setup
 
 - name: Копирай шаблоните на docker-compose и nginx
   ansible.builtin.template:
@@ -16,27 +29,57 @@
     mode: "0644"
   loop:
     - { src: "docker-compose.yml.j2", dest: "{{ project_dir }}/docker-compose.yml" }
-    - { src: "nginx.conf.j2", dest: "{{ nginx_conf }}" }
+    - { src: "nginx.conf.j2", dest: "{{ project_dir }}/nginx.conf" }
+  tags: setup
 
 - name: Генерирай wp-config.php от шаблон
   ansible.builtin.template:
     src: "wp-config.php.j2"
-    dest: "{{ wp_config }}"
+    dest: "{{ project_dir }}/wp-config.php"
     mode: "0644"
+  tags: setup
 
-# 🧱 ВМЪКНИ ТУК 👇
+- name: Копирай logstash pipeline конфигурацията
+  ansible.builtin.copy:
+    src: "logstash.conf"
+    dest: "{{ project_dir }}/logstash.conf"
+    mode: "0644"
+  tags: elk
+
+- name: Копирай Prometheus конфигурацията
+  ansible.builtin.copy:
+    src: "prometheus.yml"
+    dest: "{{ project_dir }}/prometheus.yml"
+    mode: "0644"
+  tags: monitoring
+
+- name: Копирай PHP конфигурацията
+  ansible.builtin.copy:
+    src: "php.ini"
+    dest: "{{ project_dir }}/php.ini"
+    mode: "0644"
+  tags: setup
+
+- name: Копирай Dockerfile за custom WordPress image
+  ansible.builtin.copy:
+    src: "Dockerfile"
+    dest: "{{ project_dir }}/Dockerfile"
+    mode: "0644"
+  tags: setup
+
 - name: Build custom WordPress image with PHP extensions
   ansible.builtin.command:
     cmd: docker build -t my-wordpress:php8.2-fpm .
   args:
     chdir: "{{ project_dir }}"
-# 🧱 ДОТУК ☝️
+  tags: build
 
 - name: Стартирай контейнерите с Docker Compose (с rebuild)
   ansible.builtin.command:
-    cmd: docker compose -f /opt/wordpress/docker-compose.yml up -d --build
+    cmd: docker compose -f "{{ project_dir }}/docker-compose.yml" up -d --build
   args:
     chdir: "{{ project_dir }}"
+  tags: deploy
 
 - name: Изчакай MySQL да стане healthy
   ansible.builtin.shell: |
@@ -45,6 +88,7 @@
   until: db_health.stdout == "healthy"
   retries: 30
   delay: 5
+  tags: deploy
 
 - name: Инсталирай WordPress чрез WP-CLI (ако не е инсталиран)
   ansible.builtin.command: >
@@ -62,6 +106,7 @@
   register: wp_install
   failed_when: false
   changed_when: "'Success:' in wp_install.stdout or 'WordPress is already installed.' in wp_install.stdout"
+  tags: deploy
 
 - name: Осигури права върху wp-content/uploads
   ansible.builtin.command: >
@@ -69,5 +114,4 @@
     bash -c "mkdir -p /var/www/html/wp-content/uploads &&
              chown -R www-data:www-data /var/www/html/wp-content &&
              chmod -R 755 /var/www/html/wp-content"
-  args:
-    chdir: "{{ project_dir }}"
+  tags: deploy
