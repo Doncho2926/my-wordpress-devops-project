@@ -1,0 +1,13 @@
+# Custom Nginx image for WordPress + ELK
+FROM nginx:alpine
+
+# Изтриваме символни връзки към stdout/stderr и създаваме реални лог файлове
+RUN rm -f /var/log/nginx/access.log /var/log/nginx/error.log \
+    && touch /var/log/nginx/access.log /var/log/nginx/error.log \
+    && chmod 644 /var/log/nginx/*.log
+
+# Копираме нашата конфигурация
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Стартираме nginx на преден план
+CMD ["nginx", "-g", "daemon off;"]
