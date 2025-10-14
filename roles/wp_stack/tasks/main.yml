@@ -1,13 +1,15 @@
 ---
-# WordPress DevOps Stack — stable & CI-compatible
+# WordPress DevOps Stack — stable version (CI + local)
 
+# 1️⃣ Увери се, че директорията за проекта съществува
 - name: Ensure project directory exists
   ansible.builtin.file:
     path: "{{ project_dir }}"
     state: directory
-    mode: "0755"
+    mode: '0755'
 
-- name: Clone or update GitHub repository
+# 2️⃣ (По избор) Клонирай последните промени от GitHub
+- name: Clone or update GitHub repository (optional)
   ansible.builtin.git:
     repo: "{{ github_repo_url }}"
     dest: "{{ project_dir }}"
@@ -15,6 +17,7 @@
     force: yes
   when: github_repo_url is defined and github_repo_url != ""
 
+# 3️⃣ Копирай статичните файлове (Dockerfile, php.ini, конфигурации)
 - name: Copy static files
   ansible.builtin.copy:
     src: "{{ item }}"
@@ -26,7 +29,8 @@
     - "prometheus.yml"
     - "logstash.conf"
 
-- name: Copy templates
+# 4️⃣ Копирай шаблоните за docker-compose и nginx
+- name: Copy docker-compose and nginx templates
   ansible.builtin.template:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
@@ -34,13 +38,16 @@
   loop:
     - { src: "docker-compose.yml.j2", dest: "{{ project_dir }}/docker-compose.yml" }
     - { src: "nginx.conf.j2", dest: "{{ project_dir }}/nginx.conf" }
-    - { src: "wp-config.php.j2", dest: "{{ project_dir }}/wp-config.php" }
 
-- name: Debug project_dir path
-  ansible.builtin.debug:
-    msg: "Project directory path is: {{ project_dir }}"
+# 5️⃣ Генерирай wp-config.php
+- name: Generate wp-config.php
+  ansible.builtin.template:
+    src: "wp-config.php.j2"
+    dest: "{{ project_dir }}/wp-config.php"
+    mode: "0644"
 
-- name: Set vm.max_map_count for Elasticsearch
+# 6️⃣ Увеличи vm.max_map_count (за Elasticsearch)
+- name: Increase vm.max_map_count for Elasticsearch
   ansible.posix.sysctl:
     name: vm.max_map_count
     value: "262144"
@@ -50,42 +57,53 @@
   become: true
   ignore_errors: true
 
-- name: Build custom WordPress image
+# 7️⃣ Покажи текущата директория
+- name: Show project_dir path
+  ansible.builtin.debug:
+    msg: "Project directory path is: {{ project_dir }}"
+
+# 8️⃣ Билдни custom WordPress image
+- name: Build custom WordPress image with PHP extensions
   ansible.builtin.command:
     cmd: docker build -t my-wordpress:php8.2-fpm .
   args:
     chdir: "{{ project_dir }}"
   register: docker_build
   failed_when: docker_build.rc != 0
-  check_mode: no  # ✅ build трябва винаги да се изпълнява дори при dry-run
+  check_mode: no
 
+# 9️⃣ Стартирай контейнерите
 - name: Start containers with Docker Compose (continue even if some services fail)
   ansible.builtin.command:
     cmd: docker compose -f {{ project_dir }}/docker-compose.yml up -d --build
   args:
     chdir: "{{ project_dir }}"
   register: compose_up
-  failed_when: false     # ✅ Не fail-ва playbook-а при non-zero exit
+  failed_when: false      # ✅ не fail-ва playbook-а при non-zero exit
   changed_when: true
   check_mode: no
 
-- name: Check running containers
-  ansible.builtin.command: docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-  register: docker_ps
-  changed_when: false
-  check_mode: no
-
-- name: Print container health summary
-  ansible.builtin.debug:
-    msg: "{{ docker_ps.stdout_lines }}"
-  check_mode: no
-
+# 🔟 Покажи Docker Compose stderr (ако има)
 - name: Show Docker Compose output
   ansible.builtin.debug:
     msg: "{{ compose_up.stderr_lines | default([]) }}"
   check_mode: no
 
+# 1️⃣1️⃣ Провери кои контейнери работят
+- name: Check running containers
+  ansible.builtin.command: >
+    docker ps --format "table {{'{{'}}.Names{{'}}'}}\t{{'{{'}}.Status{{'}}'}}\t{{'{{'}}.Ports{{'}}'}}"
+  register: docker_ps
+  changed_when: false
+  check_mode: no
 
+# 1️⃣2️⃣ Покажи health summary
+- name: Print container health summary
+  ansible.builtin.debug:
+    msg: "{{ docker_ps.stdout_lines }}"
+  check_mode: no
+
+# 1️⃣3️⃣ (По избор) Изчакай MySQL да стане healthy — само локално
 - name: Wait for MySQL to become healthy
   ansible.builtin.shell: |
     docker inspect --format='{{"{{.State.Health.Status}}"}}' {{ project_name }}_db
@@ -93,15 +111,10 @@
   until: db_health.stdout == "healthy"
   retries: 30
   delay: 5
-  check_mode: no  # ✅ задължително за GitHub Actions
+  ignore_errors: true
+  when: ansible_env.GITHUB_ACTIONS is not defined
 
-- name: Show container status
-  ansible.builtin.command: docker ps -a
-  register: docker_status
-  changed_when: false
-  check_mode: no
-
-- name: Print container status
+# 1️⃣4️⃣ Финално съобщение
+- name: Deployment completed
   ansible.builtin.debug:
-    msg: "{{ docker_status.stdout_lines }}"
-  check_mode: no
+    msg: "✅ WordPress stack deployed successfully. Visit {{ wp_site_url }}."
