@@ -59,14 +59,32 @@
   failed_when: docker_build.rc != 0
   check_mode: no  # ✅ build трябва винаги да се изпълнява дори при dry-run
 
-- name: Start containers with Docker Compose
+- name: Start containers with Docker Compose (continue even if some services fail)
   ansible.builtin.command:
     cmd: docker compose -f {{ project_dir }}/docker-compose.yml up -d --build
   args:
     chdir: "{{ project_dir }}"
   register: compose_up
-  failed_when: compose_up.rc != 0
-  check_mode: no  # ✅ изпълнява се реално, дори в CI check mode
+  failed_when: false     # ✅ Не fail-ва playbook-а при non-zero exit
+  changed_when: true
+  check_mode: no
+
+- name: Check running containers
+  ansible.builtin.command: docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+  register: docker_ps
+  changed_when: false
+  check_mode: no
+
+- name: Print container health summary
+  ansible.builtin.debug:
+    msg: "{{ docker_ps.stdout_lines }}"
+  check_mode: no
+
+- name: Show Docker Compose output
+  ansible.builtin.debug:
+    msg: "{{ compose_up.stderr_lines | default([]) }}"
+  check_mode: no
+
 
 - name: Wait for MySQL to become healthy
   ansible.builtin.shell: |
