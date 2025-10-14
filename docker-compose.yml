@@ -43,6 +43,7 @@ services:
     container_name: "my-wordpress-devops-project_nginx"
     depends_on:
       - wordpress
+    restart: always
     ports:
       - "8000:80"
     volumes:
@@ -55,6 +56,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: "my-wordpress-devops-project_prometheus"
+    restart: always
     ports:
       - "9090:9090"
     volumes:
@@ -65,6 +67,7 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: "my-wordpress-devops-project_cadvisor"
+    restart: always
     ports:
       - "8081:8080"
     volumes:
@@ -78,6 +81,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: "my-wordpress-devops-project_grafana"
+    restart: always
     ports:
       - "3000:3000"
     depends_on:
@@ -85,18 +89,17 @@ services:
     networks:
       - wp_net
 
-  # === FIXED ELASTICSEARCH CONFIG ===
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
     container_name: "my-wordpress-devops-project_elasticsearch"
+    restart: always
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
       - xpack.security.enabled=false
       - xpack.security.http.ssl.enabled=false
       - xpack.security.transport.ssl.enabled=false
-      - action.destructive_requires_name=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m   # ✅ Намалена памет за VM
     ulimits:
       memlock:
         soft: -1
@@ -104,21 +107,20 @@ services:
     ports:
       - "9200:9200"
     healthcheck:
-      # ✅ Използваме HTTPS и игнорираме сертификата
-      test: ["CMD-SHELL", "curl -k -fs https://localhost:9200 >/dev/null || exit 1"]
-      interval: 20s
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200 >/dev/null || exit 1"]
+      interval: 30s
       timeout: 10s
-      retries: 30
-      start_period: 40s
+      retries: 10
+      start_period: 60s
     networks:
       - wp_net
 
   logstash:
     image: docker.elastic.co/logstash/logstash:8.14.0
     container_name: "my-wordpress-devops-project_logstash"
+    restart: always
     depends_on:
-      elasticsearch:
-        condition: service_healthy
+      - elasticsearch
     environment:
       - LS_JAVA_OPTS=-Xms256m -Xmx256m
     volumes:
@@ -132,11 +134,11 @@ services:
   kibana:
     image: docker.elastic.co/kibana/kibana:8.14.0
     container_name: "my-wordpress-devops-project_kibana"
+    restart: always
     depends_on:
-      elasticsearch:
-        condition: service_healthy
+      - elasticsearch
     environment:
-      - ELASTICSEARCH_HOSTS=https://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
       - ELASTICSEARCH_SSL_VERIFICATIONMODE=none
     ports:
       - "5601:5601"
