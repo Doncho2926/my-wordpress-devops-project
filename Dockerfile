@@ -4,36 +4,40 @@ FROM wordpress:php8.2-fpm
 # Работна директория
 WORKDIR /var/www/html
 
-# Инсталираме нужните зависимости и компилираме Imagick
+# Инсталираме нужните зависимости и компилираме Imagick, GD, ZIP, OPCACHE и други PHP разширения
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        apt-utils \
-        pkg-config \
-        libpng-dev \
-        libjpeg-dev \
-        libfreetype6-dev \
-        libwebp-dev \
-        libzip-dev \
-        imagemagick \
-        libmagickwand-dev \
-        zip \
-        unzip \
-        git \
+    apt-utils \
+    pkg-config \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libwebp-dev \
+    libzip-dev \
+    zlib1g-dev \
+    imagemagick \
+    libmagickwand-dev \
+    zip \
+    unzip \
+    git \
     && docker-php-ext-enable imagick || true \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install gd mysqli zip opcache fileinfo exif \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# ✅ Копираме персонализирания php.ini (от корена на проекта)
-COPY php.ini /usr/local/etc/php/conf.d/zz-uploads.ini
+# Настройваме PHP за производителност
+RUN { \
+    echo "upload_max_filesize=64M"; \
+    echo "post_max_size=64M"; \
+    echo "memory_limit=256M"; \
+    echo "max_execution_time=120"; \
+    echo "max_input_vars=3000"; \
+    } > /usr/local/etc/php/conf.d/uploads.ini
 
-# ✅ Създаваме uploads директория и даваме права
-RUN mkdir -p /var/www/html/wp-content/uploads \
-    && chown -R www-data:www-data /var/www/html/wp-content \
-    && chmod -R 775 /var/www/html/wp-content
+# Задаваме права на wp-content (WordPress трябва да може да пише там)
+RUN chown -R www-data:www-data /var/www/html
 
-# ✅ Настройки за WordPress
-ENV WORDPRESS_DEBUG=1
-
+# Експонираме порта за PHP-FPM
 EXPOSE 9000
 
+# Стартовата команда (оставяме официалната)
 CMD ["php-fpm"]

@@ -42,7 +42,7 @@ services:
   nginx:
     build:
       context: .
-      dockerfile: Dockerfile.nginx
+      dockerfile: roles/wp_stack/files/Dockerfile.nginx   # <-- пълен път до нашия файл
     container_name: "my-wordpress-devops-project_nginx"
     depends_on:
       - wordpress
